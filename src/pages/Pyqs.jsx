@@ -57,7 +57,7 @@ export default function Pyqs() {
   const [chapter, setChapter] = useState('All')
   const [year, setYear] = useState('All')
   const [search, setSearch] = useState('')
-  const [record, setRecord] = useStoredState('msa.pyq', {})
+  const [record, setRecord] = useStoredState('np.pyq', {})
 
   const chapters = useMemo(() => {
     const all = [...syllabus[subject]['12th'], ...syllabus[subject]['11th']]

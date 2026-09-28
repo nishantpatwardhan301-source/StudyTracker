@@ -49,7 +49,7 @@ export default function Courses() {
             <div className="card pad how-to">
               <h3>How to access the app after enrolling</h3>
               <ul className="ticks">
-                <li>Android: install the <a href={site.app} target="_blank" rel="noreferrer">MSA App</a> from the Google Play Store.</li>
+                <li>Android: install the <a href={site.app} target="_blank" rel="noreferrer">our app</a> from the Google Play Store.</li>
                 <li>Web / iOS: log in at web.classplus.co with your credentials. Org code: <strong>{site.appOrgCode}</strong></li>
                 <li>Questions? Call <a href={`tel:+91${site.phone}`}>+91 {site.phone}</a></li>
               </ul>

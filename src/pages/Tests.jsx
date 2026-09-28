@@ -9,7 +9,7 @@ const qById = Object.fromEntries(questions.map((q) => [q.id, q]))
 export const maxMarks = (t) => t.questionIds.reduce((s, id) => s + marksFor(qById[id].subject), 0)
 
 export default function Tests() {
-  const attempts = load('msa.attempts', [])
+  const attempts = load('np.attempts', [])
   const best = (id) => {
     const a = attempts.filter((x) => x.testId === id)
     return a.length ? Math.max(...a.map((x) => x.score)) : null

@@ -19,7 +19,7 @@ export default function Navbar() {
           <img src="./avatar.jpg" alt="" />
           <span>
             <strong>{site.name}</strong>
-            <small>{site.academy}</small>
+            <small>{site.role}</small>
           </span>
         </Link>
         <button className="nav-toggle" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}>

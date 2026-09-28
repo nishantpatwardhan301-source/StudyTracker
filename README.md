@@ -1,6 +1,6 @@
 # Nishant Patwardhan: Official Website
 
-Website for **Prof. Nishant Patwardhan** ([YouTube: @MATRIXSCIENCEACADEMY](https://www.youtube.com/@MATRIXSCIENCEACADEMY)), Matrix Science Academy, Pune.
+Website for **Prof. Nishant Patwardhan** ([YouTube channel](https://www.youtube.com/@MATRIXSCIENCEACADEMY)), Pune.
 
 ## Features
 

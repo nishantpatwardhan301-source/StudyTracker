@@ -14,8 +14,8 @@ const confidence = ['—', 'Weak', 'Okay', 'Strong']
 const chaptersOf = (s) => [...syllabus[s]['12th'], ...syllabus[s]['11th']]
 
 export default function Tracker() {
-  const [data, setData] = useStoredState('msa.tracker', {}) // "Subject|Chapter" -> { lecture, notes, ..., conf }
-  const [examDate, setExamDate] = useStoredState('msa.examDate', '')
+  const [data, setData] = useStoredState('np.tracker', {}) // "Subject|Chapter" -> { lecture, notes, ..., conf }
+  const [examDate, setExamDate] = useStoredState('np.examDate', '')
   const [subject, setSubject] = useState('Physics')
   const [std, setStd] = useState('12th')
 

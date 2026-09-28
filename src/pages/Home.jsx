@@ -37,7 +37,7 @@ export default function Home() {
             <img src="./avatar.jpg" alt={site.name} />
             <div>
               <strong>{site.name}</strong>
-              <span>Director, {site.academy}</span>
+              <span>{site.role}</span>
             </div>
             <a className="btn btn-yt" href={site.subscribe} target="_blank" rel="noreferrer">▶ Subscribe on YouTube</a>
           </div>

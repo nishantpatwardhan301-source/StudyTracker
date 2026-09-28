@@ -7,7 +7,7 @@ export default function About() {
         <div className="container">
           <span className="eyebrow light">About</span>
           <h1>Prof. {site.name}</h1>
-          <p className="lead">Director, {site.academy}, Pune</p>
+          <p className="lead">{site.role}, Pune</p>
         </div>
       </section>
       <section className="section">
@@ -26,8 +26,8 @@ export default function About() {
             <div className="grid grid-2 contact">
               <a className="card pad" href={`tel:+91${site.phone}`}>📞<strong>Call</strong><span>+91 {site.phone}</span></a>
               <a className="card pad" href={site.whatsapp} target="_blank" rel="noreferrer">💬<strong>WhatsApp Channel</strong><span>Updates & announcements</span></a>
-              <a className="card pad" href={site.youtube} target="_blank" rel="noreferrer">▶️<strong>YouTube</strong><span>@MATRIXSCIENCEACADEMY</span></a>
-              <a className="card pad" href={site.app} target="_blank" rel="noreferrer">📱<strong>MSA App</strong><span>DPPs, PYQs & live classes</span></a>
+              <a className="card pad" href={site.youtube} target="_blank" rel="noreferrer">▶️<strong>YouTube</strong><span>{site.name}</span></a>
+              <a className="card pad" href={site.app} target="_blank" rel="noreferrer">📱<strong>Our App</strong><span>DPPs, PYQs & live classes</span></a>
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
-// Channel / academy details. Edit here to update across the whole site.
+// Channel details. Edit here to update across the whole site.
 export const site = {
   name: 'Nishant Patwardhan',
-  academy: 'Matrix Science Academy',
+  role: 'MHT-CET Physics Mentor',
   tagline: 'Learn Physics the way toppers do',
   intro:
     'Free, exam-focused lectures, tests and PYQs for MHT-CET, JEE and NEET aspirants across Maharashtra, by an MHT-CET topper and COEP engineer.',
@@ -19,7 +19,7 @@ export const site = {
     { value: '15+', label: 'Years of teaching' },
   ],
   about: [
-    'Prof. Nishant Patwardhan is one of the Directors of Matrix Science Academy, Pune, and a Physics mentor with over 15 years of teaching experience.',
+    'Prof. Nishant Patwardhan is a Pune-based Physics mentor with over 15 years of teaching experience.',
     'An MHT-CET topper himself, he scored 196/200 in MHT-CET 2010 and went on to complete his B.Tech in Mechanical Engineering from the College of Engineering Pune (COEP).',
     'He started this YouTube channel to share his experience and preparation plan, and uploads Physics and Mathematics lectures for students preparing for MHT-CET, JEE (Main & Advanced), NEET and Class 11th & 12th boards (NCERT and State Board).',
     'Under his guidance, 86 students scored above the 99 percentile mark in MHT-CET last year.',

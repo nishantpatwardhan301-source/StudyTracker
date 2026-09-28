@@ -45,7 +45,7 @@ export default function TestRunner() {
       testId: test.id, title: test.title, score, max: maxMarks(test), correct, attempted,
       total: qs.length, timeSec: Math.round((Date.now() - startedAt) / 1000), perSubject, at: Date.now(),
     }
-    save('msa.attempts', [...load('msa.attempts', []), r])
+    save('np.attempts', [...load('np.attempts', []), r])
     setResult(r)
     setPhase('result')
     window.scrollTo(0, 0)
