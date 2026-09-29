@@ -15,7 +15,7 @@ const links = [
 export default function Navbar() {
   const [open, setOpen] = useState(false)
   const { user } = useAuth()
-  const firstName = (user?.user_metadata?.full_name || user?.email || '').split(/[ @]/)[0]
+  const firstName = user?.user_metadata?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || (user?.phone ? `…${user.phone.slice(-4)}` : '')
   return (
     <header className="nav">
       <div className="container nav-inner">
@@ -36,7 +36,7 @@ export default function Navbar() {
             </NavLink>
           ))}
           {user ? (
-            <button className="btn btn-ghost btn-sm" title={user.email} onClick={() => { supabase.auth.signOut(); setOpen(false) }}>
+            <button className="btn btn-ghost btn-sm" title={user.email || user.phone} onClick={() => { supabase.auth.signOut(); setOpen(false) }}>
               👤 {firstName} · Log out
             </button>
           ) : (

@@ -29,7 +29,7 @@ Answers are revealed only through two database functions:
 - `check_answer`: after a student attempts a PYQ
 - `submit_test`: scores a test on the server and returns the solutions
 
-Students can use everything without logging in; their progress is then kept in the browser. After logging in (email + password) it is stored in Supabase and follows them across devices. Anything ticked before logging in is carried over.
+Students can use everything without logging in; their progress is then kept in the browser. After logging in (WhatsApp OTP, or email + password) it is stored in Supabase and follows them across devices. Anything ticked before logging in is carried over.
 
 The schema lives in `supabase/migrations/`. The Supabase URL and publishable key are in `src/lib/supabase.js`. They are safe to be public; override them with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
@@ -55,3 +55,11 @@ npm run build    # production build in dist/
 
 - **GitHub Pages:** merge to `main`, then in *Settings → Pages* set **Source = GitHub Actions**. The workflow in `.github/workflows/deploy.yml` builds and publishes the site.
 - **Vercel / Netlify:** import the repo. Build command `npm run build`, output directory `dist`.
+
+### WhatsApp OTP login
+
+Login uses Supabase Auth phone OTP. The code is delivered over WhatsApp by the `send-whatsapp-otp` Edge Function (`supabase/functions/send-whatsapp-otp`), which Supabase calls as its **Send SMS hook**. It uses the Meta WhatsApp Cloud API, the same way Gurutva does. One-time setup in the Supabase dashboard:
+
+1. **Edge Functions → Secrets:** add `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN` and `WHATSAPP_OTP_TEMPLATE_NAME` (optionally `WHATSAPP_OTP_TEMPLATE_LANG`, default `en`).
+2. **Authentication → Sign In / Providers → Phone:** enable it.
+3. **Authentication → Hooks → Send SMS hook:** choose HTTPS, set the URL to `https://cugmfkuiqayuqlqkjham.supabase.co/functions/v1/send-whatsapp-otp`, generate a secret, and save it as the Edge Function secret `SEND_SMS_HOOK_SECRET`.
