@@ -134,7 +134,7 @@ export default function Tracker() {
                       {weak.map((c) => (
                         <li key={c.id}>
                           {c.name} ({subjectLabel[c.subject]}){' '}
-                          {c.question_count > 0 && <Link to={`/pyqs?subject=${c.subject}&chapter=${c.id}`}>Practise PYQs →</Link>}
+                          {c.question_count > 0 && <Link to={`/pyqs/${c.id}`}>Practise PYQs →</Link>}
                         </li>
                       ))}
                     </ul>
@@ -172,7 +172,7 @@ export default function Tracker() {
                           <td>
                             <span className="ch-name">{c.name}</span>
                             {c.question_count > 0 && (
-                              <Link className="small ch-pyq" to={`/pyqs?subject=${c.subject}&chapter=${c.id}`}>{c.question_count} PYQs</Link>
+                              <Link className="small ch-pyq" to={`/pyqs/${c.id}`}>{c.question_count} PYQs</Link>
                             )}
                             <div className="bar thin"><div style={{ width: `${(done / steps.length) * 100}%` }} /></div>
                           </td>
