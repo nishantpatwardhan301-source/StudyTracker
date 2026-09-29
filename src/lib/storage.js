@@ -22,6 +22,6 @@ export function save(key, value) {
 
 export function useStoredState(key, fallback) {
   const [value, setValue] = useState(() => load(key, fallback))
-  useEffect(() => save(key, value), [key, value])
+  useEffect(() => { save(key, value) }, [key, value])
   return [value, setValue]
 }
