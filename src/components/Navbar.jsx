@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { site } from '../data/site'
 import { useAuth } from '../lib/auth'
-import { supabase } from '../lib/supabase'
 
 const links = [
   { to: '/courses', label: 'Courses' },
@@ -36,9 +35,9 @@ export default function Navbar() {
             </NavLink>
           ))}
           {user ? (
-            <button className="btn btn-ghost btn-sm" title={user.email || user.phone} onClick={() => { supabase.auth.signOut(); setOpen(false) }}>
-              👤 {firstName} · Log out
-            </button>
+            <NavLink to="/profile" className="btn btn-ghost btn-sm" title={user.email || user.phone} onClick={() => setOpen(false)}>
+              👤 {firstName || 'My profile'}
+            </NavLink>
           ) : (
             <NavLink to="/login" className="btn btn-ghost btn-sm" onClick={() => setOpen(false)}>Log in</NavLink>
           )}

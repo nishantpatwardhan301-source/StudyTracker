@@ -11,6 +11,7 @@ import PyqPractice from './pages/PyqPractice'
 import Tracker from './pages/Tracker'
 import About from './pages/About'
 import Login from './pages/Login'
+import Profile from './pages/Profile'
 import NotFound from './pages/NotFound'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/tracker" element={<Tracker />} />
           <Route path="/about" element={<About />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/profile" element={<Profile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
         </ErrorBoundary>

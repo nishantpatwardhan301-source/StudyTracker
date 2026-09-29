@@ -1,106 +1,45 @@
-// Renders the plain-text maths notation used in the question bank as real
-// maths: (a)/(b) -> stacked fraction, √(x) -> root with a bar, ^(x) -> superscript,
-// _(x) -> subscript. Lines made of "a | b | c" cells become small tables.
+import { memo, useMemo } from 'react'
+import katex from 'katex'
+import { chunkLine, nodesToLatex, plain } from '../lib/mathLatex'
 
-function matchParen(s, open) {
-  let depth = 0
-  for (let j = open; j < s.length; j++) {
-    if (s[j] === '(') depth++
-    else if (s[j] === ')' && --depth === 0) return j
+// Typesets question text with KaTeX. The bank's plain-text notation is converted to
+// LaTeX (see lib/mathLatex.js); prose stays as normal text and wraps naturally.
+// Lines made of "a | b | c" cells become small tables.
+
+function renderChunk(nodes) {
+  try {
+    return katex.renderToString(nodesToLatex(nodes), { throwOnError: true, strict: 'ignore', output: 'html' })
+  } catch {
+    return null
   }
-  return -1
 }
 
-export function parseMath(s) {
-  const out = []
-  let buf = ''
-  let i = 0
-  const flush = () => { if (buf) { out.push(buf); buf = '' } }
-
-  while (i < s.length) {
-    const c = s[i]
-
-    if (c === '(') {
-      const j = matchParen(s, i)
-      if (j < 0) { buf += c; i++; continue }
-      const inner = s.slice(i + 1, j)
-      if (s[j + 1] === '/' && s[j + 2] === '(') {
-        const k = matchParen(s, j + 2)
-        if (k > 0) {
-          flush()
-          out.push({ t: 'frac', num: parseMath(inner), den: parseMath(s.slice(j + 3, k)) })
-          i = k + 1
-          continue
-        }
-      }
-      flush()
-      out.push({ t: 'group', c: parseMath(inner) })
-      i = j + 1
-      continue
-    }
-
-    if (c === '√') {
-      if (s[i + 1] === '(') {
-        const j = matchParen(s, i + 1)
-        if (j > 0) { flush(); out.push({ t: 'sqrt', c: parseMath(s.slice(i + 2, j)) }); i = j + 1; continue }
-      }
-      const m = /^(\d+(\.\d+)?|[A-Za-zα-ωπ])/.exec(s.slice(i + 1))
-      if (m) { flush(); out.push({ t: 'sqrt', c: [m[0]] }); i += 1 + m[0].length; continue }
-    }
-
-    if ((c === '^' || c === '_') && s[i + 1] === '(') {
-      const j = matchParen(s, i + 1)
-      if (j > 0) { flush(); out.push({ t: c === '^' ? 'sup' : 'sub', c: parseMath(s.slice(i + 2, j)) }); i = j + 1; continue }
-    }
-
-    buf += c
-    i++
-  }
-  flush()
-  return out
-}
-
-function Nodes({ nodes }) {
-  return nodes.map((n, i) => {
-    if (typeof n === 'string') return <span key={i}>{n}</span>
-    switch (n.t) {
-      case 'frac':
-        return (
-          <span key={i} className="m-frac">
-            <span className="m-num"><Nodes nodes={n.num} /></span>
-            <span className="m-den"><Nodes nodes={n.den} /></span>
-          </span>
-        )
-      case 'sqrt':
-        return (
-          <span key={i} className="m-sqrt">
-            <span className="m-rad">√</span>
-            <span className="m-rc"><Nodes nodes={n.c} /></span>
-          </span>
-        )
-      case 'sup':
-        return <sup key={i}><Nodes nodes={n.c} /></sup>
-      case 'sub':
-        return <sub key={i}><Nodes nodes={n.c} /></sub>
-      default:
-        return <span key={i}>(<Nodes nodes={n.c} />)</span>
-    }
+function Line({ text }) {
+  const parts = useMemo(() => chunkLine(text), [text])
+  return parts.map((c, i) => {
+    if (c.space) return <span key={i}>{c.space}</span>
+    if (!c.math) return <span key={i}>{c.text}</span>
+    const html = renderChunk(c.nodes)
+    return html
+      ? <span key={i} className="kx" dangerouslySetInnerHTML={{ __html: html }} />
+      : <span key={i}>{c.nodes.map(plain).join('')}</span>
   })
 }
 
-const Line = ({ text }) => <Nodes nodes={parseMath(text)} />
 const isTableRow = (line) => (line.match(/\|/g) || []).length >= 2
 
-export default function MathText({ text, className = '' }) {
-  const lines = String(text ?? '').trim().split('\n')
-  const blocks = []
-  for (const line of lines) {
-    const last = blocks[blocks.length - 1]
-    if (isTableRow(line)) {
-      if (last?.table) last.rows.push(line)
-      else blocks.push({ table: true, rows: [line] })
-    } else blocks.push({ table: false, line })
-  }
+function MathText({ text, className = '' }) {
+  const blocks = useMemo(() => {
+    const out = []
+    for (const line of String(text ?? '').trim().split('\n')) {
+      const last = out[out.length - 1]
+      if (isTableRow(line)) {
+        if (last?.table) last.rows.push(line)
+        else out.push({ table: true, rows: [line] })
+      } else out.push({ table: false, line })
+    }
+    return out
+  }, [text])
 
   return (
     <span className={`math ${className}`}>
@@ -116,8 +55,7 @@ export default function MathText({ text, className = '' }) {
             </table>
           </span>
         ) : (
-          <span key={i}>
-            {i > 0 && !blocks[i - 1].table && <br />}
+          <span key={i} className="m-line">
             <Line text={b.table ? b.rows[0] : b.line} />
           </span>
         )
@@ -125,3 +63,5 @@ export default function MathText({ text, className = '' }) {
     </span>
   )
 }
+
+export default memo(MathText)

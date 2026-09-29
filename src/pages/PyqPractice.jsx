@@ -25,6 +25,7 @@ export default function PyqPractice() {
   const [attempts, setAttempts] = useState({})
   const [reveals, setReveals] = useState({})
   const [busy, setBusy] = useState(false)
+  const [selected, setSelected] = useState(null) // option chosen but not yet submitted
   const [showSol, setShowSol] = useState(true)
   const [err, setErr] = useState(null)
   // Attempts as they were when the filter was chosen, so answering doesn't reshuffle the list.
@@ -71,6 +72,9 @@ export default function PyqPractice() {
   const cur = list[idx]
   const go = useCallback((i) => setParams({ q: String(i + 1) }, { replace: true }), [setParams])
 
+  // A new question starts with nothing selected.
+  useEffect(() => { setSelected(null) }, [cur?.id])
+
   // Fetch the answer + option stats for questions already attempted (does not count again).
   useEffect(() => {
     if (!cur || reveals[cur.id] || !attempts[cur.id]) return
@@ -86,15 +90,19 @@ export default function PyqPractice() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.closest('input, select, textarea')) return
+      if (/^[a-dA-D1-4]$/.test(e.key) && cur && !attempts[cur.id]) setSelected(LETTERS['abcd1234'.indexOf(e.key.toLowerCase()) % 4])
+      if (e.key === 'Enter' && selected && cur && !attempts[cur.id]) submit()
       if (e.key === 'ArrowRight' && idx < list.length - 1) go(idx + 1)
       if (e.key === 'ArrowLeft' && idx > 0) go(idx - 1)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [idx, list.length, go])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idx, list.length, go, cur, attempts, selected])
 
-  async function pick(letter) {
-    if (!cur || attempts[cur.id] || busy) return
+  async function submit() {
+    const letter = selected
+    if (!cur || !letter || attempts[cur.id] || busy) return
     setBusy(true); setErr(null)
     const { data: r, error } = await supabase.rpc('check_answer', { p_question_id: cur.id, p_selected: letter })
     setBusy(false)
@@ -180,10 +188,11 @@ export default function PyqPractice() {
                   const isCorrect = revealed && rev.correct_option === L
                   const isPicked = mine?.p === L
                   const pct = revealed ? rev.stats?.[L] ?? 0 : 0
-                  const cls = ['opt2', revealed && 'revealed', isCorrect && 'correct', revealed && isPicked && !isCorrect && 'wrong', isPicked && 'picked']
+                  const isSelected = !mine && selected === L
+                  const cls = ['opt2', revealed && 'revealed', isCorrect && 'correct', revealed && isPicked && !isCorrect && 'wrong', isPicked && 'picked', isSelected && 'selected']
                     .filter(Boolean).join(' ')
                   return (
-                    <button key={L} className={cls} disabled={!!mine || busy} onClick={() => pick(L)}>
+                    <button key={L} className={cls} disabled={!!mine || busy} onClick={() => setSelected(L)} aria-pressed={isSelected}>
                       {revealed && <span className="opt2-bar" style={{ width: `${pct}%` }} />}
                       <span className="opt2-letter">{isCorrect ? '✓' : revealed && isPicked ? '✗' : L}</span>
                       <span className="opt2-text"><MathText text={o} /></span>
@@ -213,15 +222,25 @@ export default function PyqPractice() {
                   {showSol && <div className="sol-body"><MathText text={rev.explanation || 'Solution coming soon.'} /></div>}
                 </div>
               )}
-              {!mine && <p className="small muted tap-hint">Tap an option to check your answer.</p>}
+              {!mine && (
+                <p className="small muted tap-hint">{selected ? `Option ${selected} selected. Press Submit to check.` : 'Select an option, then press Submit.'}</p>
+              )}
             </article>
 
             <div className="practice-nav">
-              <button className="btn btn-ghost" disabled={idx === 0} onClick={() => go(idx - 1)}>← Previous</button>
-              <span className="small muted">{idx + 1} of {list.length}</span>
-              <button className="btn btn-primary" disabled={idx >= list.length - 1} onClick={() => go(idx + 1)}>
-                {mine ? 'Next →' : 'Skip →'}
-              </button>
+              <div className="container practice-nav-inner">
+                <button className="btn btn-ghost" disabled={idx === 0} onClick={() => go(idx - 1)}>← <span className="hide-sm">Previous</span></button>
+                {!mine ? (
+                  <button className="btn btn-primary submit-btn" disabled={!selected || busy} onClick={submit}>
+                    {busy ? 'Checking…' : 'Submit'}
+                  </button>
+                ) : (
+                  <span className="small muted">{idx + 1} of {list.length}</span>
+                )}
+                <button className={mine ? 'btn btn-primary' : 'btn btn-ghost'} disabled={idx >= list.length - 1} onClick={() => go(idx + 1)}>
+                  {mine ? 'Next' : 'Skip'} →
+                </button>
+              </div>
             </div>
           </>
         )}
