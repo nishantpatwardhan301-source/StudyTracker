@@ -13,7 +13,25 @@ Website for **Prof. Nishant Patwardhan** ([YouTube channel](https://www.youtube.
 | **Study Tracker** | Chapter-by-chapter checklist (Lecture → Notes → PYQs → Revision 1 → Revision 2), confidence level, weak-chapter list, exam countdown, progress rings |
 | **About / Contact** | Bio, stats, phone, WhatsApp channel, app link |
 
-Student progress (tests, PYQs, tracker) is saved in the student's browser (`localStorage`). No login is needed yet. A backend such as Supabase can be added later for accounts and leaderboards.
+## Backend (Supabase)
+
+The site uses its own Supabase project, **Nishant Patwardhan** (`cugmfkuiqayuqlqkjham`, Mumbai region). It is separate from Gurutva.
+
+| Table | Purpose |
+| --- | --- |
+| `papers` | One row per real MHT-CET shift |
+| `chapters` | MHT-CET PCM chapter list (used by the PYQ Portal and Study Tracker) |
+| `questions` | PYQs. `correct_option` and `explanation` are **not readable** from the browser |
+| `profiles` | One per student, created automatically on sign-up |
+| `tracker_progress`, `pyq_progress`, `test_attempts` | Per-student data, protected by Row Level Security |
+
+Answers are revealed only through two database functions:
+- `check_answer`: after a student attempts a PYQ
+- `submit_test`: scores a test on the server and returns the solutions
+
+Students can use everything without logging in; their progress is then kept in the browser. After logging in (email + password) it is stored in Supabase and follows them across devices. Anything ticked before logging in is carried over.
+
+The schema lives in `supabase/migrations/`. The Supabase URL and publishable key are in `src/lib/supabase.js`. They are safe to be public; override them with `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`.
 
 ## Editing content (no coding needed)
 
@@ -21,12 +39,9 @@ All content lives in `src/data/`:
 
 - `site.js`: name, bio, stats, links, phone, latest videos
 - `courses.js`: running/upcoming courses and the playlist library
-- `questions.js`: **question bank for PYQs and tests** (instructions at the top of the file)
-- `tests.js`: which questions go into which test, durations, upcoming tests
-- `syllabus.js`: MHT-CET chapter list used by the tracker and PYQ portal
+- `tests.js`: test durations and upcoming tests
 
-> The questions currently in `questions.js` are practice questions (`year: null`).
-> Add official MHT-CET PYQs with `year` and `shift` filled in; the PYQ Portal then shows year tags and the year filter automatically.
+Questions, papers and chapters live in the Supabase database, not in these files.
 
 ## Run locally
 

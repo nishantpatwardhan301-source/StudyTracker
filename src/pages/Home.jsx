@@ -1,14 +1,12 @@
 import { Link } from 'react-router-dom'
 import { site, latestVideos } from '../data/site'
 import { featuredCourses } from '../data/courses'
-import { questions } from '../data/questions'
-import { tests } from '../data/tests'
 import { VideoCard, CourseCard, SectionHead } from '../components/Cards'
 
 const portals = [
   { to: '/courses', icon: '🎓', title: 'Courses', text: 'Running and upcoming batches, plus 29 free playlists.', color: 'var(--brand)' },
-  { to: '/tests', icon: '📝', title: 'Test Portal', text: `Timed MHT-CET-pattern tests with instant analysis. ${tests.length} tests live.`, color: 'var(--physics)' },
-  { to: '/pyqs', icon: '📚', title: 'PYQ Portal', text: 'Free chapter-wise MHT-CET PYQs with solutions.', color: 'var(--chemistry)' },
+  { to: '/tests', icon: '📝', title: 'Test Portal', text: 'Attempt real MHT-CET 2026 shift papers as timed mocks with instant analysis.', color: 'var(--physics)' },
+  { to: '/pyqs', icon: '📚', title: 'PYQ Portal', text: '2,100 real MHT-CET PYQs, chapter-wise, with explanations.', color: 'var(--chemistry)' },
   { to: '/tracker', icon: '📈', title: 'Study Tracker', text: 'Track lectures, notes, PYQs and revision chapter by chapter.', color: 'var(--maths)' },
 ]
 
@@ -99,7 +97,7 @@ export default function Home() {
           <div>
             <h2>Start solving PYQs today</h2>
             <p className="muted">
-              {questions.length}+ questions with step-by-step solutions, organised by subject and chapter. No login needed.
+              Real MHT-CET questions from every 2026 shift with step-by-step explanations, organised by chapter. Free, no login needed.
             </p>
           </div>
           <div className="hero-actions">

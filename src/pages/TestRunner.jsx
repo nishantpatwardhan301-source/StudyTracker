@@ -1,55 +1,69 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { tests, marksFor } from '../data/tests'
-import { questions } from '../data/questions'
+import { supabase, QUESTION_COLUMNS, optionsOf, LETTERS, paperLabel, subjectLabel } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
+import { useAsync, q as unwrap } from '../lib/useAsync'
 import { load, save } from '../lib/storage'
-import { maxMarks } from './Tests'
+import { scopes } from '../data/tests'
+import { Loading, ErrorBox, Rich } from '../components/Status'
 
-const letters = ['A', 'B', 'C', 'D']
-const qById = Object.fromEntries(questions.map((q) => [q.id, q]))
+const SUBJECT_ORDER = { physics: 0, chemistry: 1, maths: 2 }
 
 function fmt(sec) {
-  const m = Math.floor(sec / 60)
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
   const s = sec % 60
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return `${h ? `${h}:` : ''}${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 export default function TestRunner() {
-  const { testId } = useParams()
-  const test = tests.find((t) => t.id === testId)
-  const qs = useMemo(() => (test ? test.questionIds.map((id) => qById[id]) : []), [test])
+  const { paperId, scope = 'full' } = useParams()
+  const { user } = useAuth()
+  const cfg = scopes[scope]
 
-  const [phase, setPhase] = useState('intro') // intro | running | result
+  const data = useAsync(async () => {
+    const [paper] = await unwrap(supabase.rpc('paper_summary').eq('id', paperId))
+    let query = supabase.from('questions').select(QUESTION_COLUMNS).eq('paper_id', paperId)
+    if (scope !== 'full') query = query.eq('subject', scope)
+    const rows = await unwrap(query.order('question_number').limit(200))
+    rows.sort((a, b) => SUBJECT_ORDER[a.subject] - SUBJECT_ORDER[b.subject] || a.question_number - b.question_number)
+    return { paper, qs: rows }
+  }, [paperId, scope])
+
+  const paper = data.data?.paper
+  const qs = useMemo(() => data.data?.qs || [], [data.data])
+  const maxMarks = qs.reduce((s, x) => s + x.marks, 0)
+
+  const [phase, setPhase] = useState('intro') // intro | running | submitting | result
   const [idx, setIdx] = useState(0)
-  const [answers, setAnswers] = useState({}) // qid -> option index
-  const [marked, setMarked] = useState({}) // qid -> bool
+  const [answers, setAnswers] = useState({}) // qid -> 'A'..'D'
+  const [marked, setMarked] = useState({})
   const [visited, setVisited] = useState({})
   const [endAt, setEndAt] = useState(null)
   const [now, setNow] = useState(Date.now())
-  const [startedAt, setStartedAt] = useState(null)
+  const startedAt = useRef(null)
   const [result, setResult] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
 
-  const submit = useCallback(() => {
-    let score = 0, correct = 0, attempted = 0
-    const perSubject = {}
-    qs.forEach((q) => {
-      const ps = (perSubject[q.subject] ??= { score: 0, max: 0, correct: 0, wrong: 0, skipped: 0 })
-      const m = marksFor(q.subject)
-      ps.max += m
-      const a = answers[q.id]
-      if (a === undefined) { ps.skipped++; return }
-      attempted++
-      if (a === q.answer) { score += m; correct++; ps.score += m; ps.correct++ } else ps.wrong++
+  const submit = useCallback(async () => {
+    setPhase('submitting')
+    const timeSec = Math.round((Date.now() - startedAt.current) / 1000)
+    const { data: r, error } = await supabase.rpc('submit_test', {
+      p_paper_id: paperId, p_scope: scope, p_answers: answers, p_time_seconds: timeSec,
     })
-    const r = {
-      testId: test.id, title: test.title, score, max: maxMarks(test), correct, attempted,
-      total: qs.length, timeSec: Math.round((Date.now() - startedAt) / 1000), perSubject, at: Date.now(),
+    if (error) { setSubmitError(error); setPhase('running'); return }
+    r.timeSec = timeSec
+    if (!user) {
+      save('np.attempts', [
+        { id: String(Date.now()), paper_id: paperId, scope, score: r.score, max_score: r.max_score,
+          correct: r.correct, attempted: r.attempted, created_at: new Date().toISOString() },
+        ...load('np.attempts', []),
+      ].slice(0, 20))
     }
-    save('np.attempts', [...load('np.attempts', []), r])
     setResult(r)
     setPhase('result')
     window.scrollTo(0, 0)
-  }, [qs, answers, test, startedAt])
+  }, [paperId, scope, answers, user])
 
   useEffect(() => {
     if (phase !== 'running') return
@@ -59,48 +73,51 @@ export default function TestRunner() {
 
   const remaining = endAt ? Math.max(0, Math.round((endAt - now) / 1000)) : 0
   useEffect(() => {
-    if (phase === 'running' && remaining === 0) submit()
-  }, [phase, remaining, submit])
+    if (phase === 'running' && endAt && remaining === 0) submit()
+  }, [phase, endAt, remaining, submit])
 
   useEffect(() => {
     if (phase === 'running' && qs[idx]) setVisited((v) => ({ ...v, [qs[idx].id]: true }))
   }, [phase, idx, qs])
 
-  if (!test) {
+  if (!cfg) return <section className="section"><div className="container"><ErrorBox error="Unknown test type" /></div></section>
+  if (data.loading) return <section className="section"><div className="container narrow"><Loading text="Loading paper…" /></div></section>
+  if (data.error || !paper || qs.length === 0) {
     return (
       <section className="section"><div className="container empty">
-        <h1>Test not found</h1><Link to="/tests" className="btn btn-primary">Back to tests</Link>
+        <h1 className="h2">Paper not available</h1>
+        {data.error && <ErrorBox error={data.error} />}
+        <Link to="/tests" className="btn btn-primary">Back to tests</Link>
       </div></section>
     )
   }
+  const title = `MHT-CET ${paperLabel(paper)} · ${cfg.label}`
 
   if (phase === 'intro') {
-    const subjects = [...new Set(qs.map((q) => q.subject))]
+    const subjects = [...new Set(qs.map((x) => x.subject))]
     return (
       <section className="section">
         <div className="container narrow">
           <div className="card pad">
             <span className="eyebrow">Instructions</span>
-            <h1 className="h2">{test.title}</h1>
+            <h1 className="h2">{title}</h1>
             <div className="test-meta big">
-              <span>⏱ {test.durationMin} minutes</span>
+              <span>⏱ {cfg.minutes} minutes</span>
               <span>❓ {qs.length} questions</span>
-              <span>🎯 {maxMarks(test)} marks</span>
+              <span>🎯 {maxMarks} marks</span>
             </div>
             <ul className="ticks">
-              <li>Subjects: {subjects.join(', ')}.</li>
+              <li>Subjects: {subjects.map((s) => subjectLabel[s]).join(', ')}.</li>
               <li>Physics & Chemistry: +1 per correct answer. Mathematics: +2 per correct answer.</li>
               <li>No negative marking, so attempt every question.</li>
               <li>Use the palette to jump between questions. “Mark for review” flags a question to revisit.</li>
               <li>The test auto-submits when the timer ends.</li>
+              {!user && <li><Link to="/login" state={{ from: `/tests/${paperId}/${scope}` }}>Log in</Link> first if you want this attempt saved to your account.</li>}
             </ul>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                const t = Date.now()
-                setStartedAt(t); setEndAt(t + test.durationMin * 60 * 1000); setNow(t); setPhase('running')
-              }}
-            >
+            <button className="btn btn-primary" onClick={() => {
+              const t = Date.now()
+              startedAt.current = t; setEndAt(t + cfg.minutes * 60 * 1000); setNow(t); setPhase('running')
+            }}>
               I’m ready, start test
             </button>
           </div>
@@ -111,15 +128,15 @@ export default function TestRunner() {
 
   if (phase === 'result') {
     const r = result
-    const pct = Math.round((r.score / r.max) * 100)
+    const pct = r.max_score ? Math.round((r.score / r.max_score) * 100) : 0
     return (
       <section className="section">
         <div className="container">
           <div className="card pad result-hero">
             <div className="ring" style={{ '--p': pct }}><span>{pct}%</span></div>
             <div>
-              <span className="eyebrow">Result</span>
-              <h1 className="h2">{r.score} / {r.max} marks</h1>
+              <span className="eyebrow">Result · {title}</span>
+              <h1 className="h2">{r.score} / {r.max_score} marks</h1>
               <div className="test-meta">
                 <span>✅ {r.correct} correct</span>
                 <span>❌ {r.attempted - r.correct} wrong</span>
@@ -135,35 +152,37 @@ export default function TestRunner() {
           </div>
 
           <div className="grid grid-3 mt">
-            {Object.entries(r.perSubject).map(([s, v]) => (
+            {Object.entries(r.per_subject).sort(([a], [b]) => SUBJECT_ORDER[a] - SUBJECT_ORDER[b]).map(([s, v]) => (
               <div key={s} className="card pad">
-                <span className={`chip chip-${s.toLowerCase()}`}>{s}</span>
+                <span className={`chip chip-${s === 'maths' ? 'mathematics' : s}`}>{subjectLabel[s]}</span>
                 <h3>{v.score} / {v.max}</h3>
-                <div className="bar"><div style={{ width: `${(v.score / v.max) * 100}%` }} /></div>
+                <div className="bar"><div style={{ width: `${v.max ? (v.score / v.max) * 100 : 0}%` }} /></div>
                 <p className="muted small">{v.correct} correct · {v.wrong} wrong · {v.skipped} skipped</p>
               </div>
             ))}
           </div>
 
           <h2 className="mt">Solutions</h2>
-          {qs.map((q, i) => {
-            const a = answers[q.id]
-            const state = a === undefined ? 'skipped' : a === q.answer ? 'correct' : 'wrong'
+          {qs.map((x, i) => {
+            const a = answers[x.id]
+            const key = r.key[x.id] || {}
+            const state = !a ? 'skipped' : a === key.c ? 'correct' : 'wrong'
             return (
-              <div key={q.id} className={`card pad review review-${state}`}>
+              <div key={x.id} className={`card pad review review-${state}`}>
                 <div className="review-head">
-                  <strong>Q{i + 1}.</strong> <span className="muted small">{q.subject} · {q.chapter}</span>
+                  <strong>Q{i + 1}.</strong> <span className="muted small">{subjectLabel[x.subject]}{x.topic ? ` · ${x.topic}` : ''} · +{x.marks}</span>
                   <span className={`pill pill-${state}`}>{state}</span>
                 </div>
-                <p>{q.q}</p>
+                <p><Rich text={x.question_text} /></p>
+                {x.image_url && <img className="q-img" src={x.image_url} alt="Question diagram" loading="lazy" />}
                 <ol className="opts static">
-                  {q.options.map((o, oi) => (
-                    <li key={oi} className={oi === q.answer ? 'is-correct' : oi === a ? 'is-wrong' : ''}>
-                      <span className="opt-letter">{letters[oi]}</span>{o}
+                  {optionsOf(x).map((o, oi) => (
+                    <li key={oi} className={LETTERS[oi] === key.c ? 'is-correct' : LETTERS[oi] === a ? 'is-wrong' : ''}>
+                      <span className="opt-letter">{LETTERS[oi]}</span><Rich text={o} />
                     </li>
                   ))}
                 </ol>
-                <div className="solution"><strong>Solution:</strong> {q.solution}</div>
+                {key.e && <div className="solution"><strong>Solution:</strong> <Rich text={key.e} /></div>}
               </div>
             )
           })}
@@ -172,62 +191,65 @@ export default function TestRunner() {
     )
   }
 
-  // running
-  const q = qs[idx]
-  const statusOf = (qq) =>
-    marked[qq.id] ? 'marked' : answers[qq.id] !== undefined ? 'answered' : visited[qq.id] ? 'visited' : 'new'
+  // running / submitting
+  const cur = qs[idx]
+  const statusOf = (x) => (marked[x.id] ? 'marked' : answers[x.id] ? 'answered' : visited[x.id] ? 'visited' : 'new')
   const answeredCount = Object.keys(answers).length
+  const confirmSubmit = () => window.confirm(`You have answered ${answeredCount} of ${qs.length}. Submit now?`) && submit()
 
   return (
     <section className="section exam">
       <div className="container exam-grid">
         <div>
           <div className="exam-bar card">
-            <strong>{test.title}</strong>
+            <strong>{title}</strong>
             <span className={remaining < 60 ? 'timer low' : 'timer'}>⏱ {fmt(remaining)}</span>
           </div>
+          {submitError && <ErrorBox error={submitError} />}
           <div className="card pad">
             <div className="review-head">
               <strong>Question {idx + 1} of {qs.length}</strong>
-              <span className="muted small">{q.subject} · {q.chapter} · +{marksFor(q.subject)}</span>
+              <span className="muted small">{subjectLabel[cur.subject]} · +{cur.marks}</span>
             </div>
-            <p className="q-text">{q.q}</p>
+            <p className="q-text"><Rich text={cur.question_text} /></p>
+            {cur.image_url && <img className="q-img" src={cur.image_url} alt="Question diagram" />}
             <ol className="opts">
-              {q.options.map((o, oi) => (
+              {optionsOf(cur).map((o, oi) => (
                 <li key={oi}>
-                  <button
-                    className={answers[q.id] === oi ? 'selected' : ''}
-                    onClick={() => setAnswers({ ...answers, [q.id]: oi })}
-                  >
-                    <span className="opt-letter">{letters[oi]}</span>{o}
+                  <button className={answers[cur.id] === LETTERS[oi] ? 'selected' : ''}
+                    onClick={() => setAnswers({ ...answers, [cur.id]: LETTERS[oi] })}>
+                    <span className="opt-letter">{LETTERS[oi]}</span><Rich text={o} />
                   </button>
                 </li>
               ))}
             </ol>
             <div className="exam-actions">
-              <button className="btn btn-ghost btn-sm" onClick={() => { const n = { ...answers }; delete n[q.id]; setAnswers(n) }}>Clear</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => setMarked({ ...marked, [q.id]: !marked[q.id] })}>
-                {marked[q.id] ? 'Unmark' : 'Mark for review'}
+              <button className="btn btn-ghost btn-sm" onClick={() => { const n = { ...answers }; delete n[cur.id]; setAnswers(n) }}>Clear</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setMarked({ ...marked, [cur.id]: !marked[cur.id] })}>
+                {marked[cur.id] ? 'Unmark' : 'Mark for review'}
               </button>
               <span className="spacer" />
               <button className="btn btn-ghost btn-sm" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>← Prev</button>
               {idx < qs.length - 1 ? (
                 <button className="btn btn-primary btn-sm" onClick={() => setIdx(idx + 1)}>Save & Next →</button>
               ) : (
-                <button className="btn btn-primary btn-sm" onClick={() => window.confirm('Submit the test?') && submit()}>Submit</button>
+                <button className="btn btn-primary btn-sm" disabled={phase === 'submitting'} onClick={confirmSubmit}>Submit</button>
               )}
             </div>
           </div>
         </div>
         <aside className="card pad palette">
           <h4>Question palette</h4>
-          <div className="palette-grid">
-            {qs.map((qq, i) => (
-              <button key={qq.id} className={`p-${statusOf(qq)} ${i === idx ? 'current' : ''}`} onClick={() => setIdx(i)}>
-                {i + 1}
-              </button>
-            ))}
-          </div>
+          {['physics', 'chemistry', 'maths'].filter((s) => qs.some((x) => x.subject === s)).map((s) => (
+            <div key={s}>
+              <div className="small muted palette-sub">{subjectLabel[s]}</div>
+              <div className="palette-grid">
+                {qs.map((x, i) => x.subject === s && (
+                  <button key={x.id} className={`p-${statusOf(x)} ${i === idx ? 'current' : ''}`} onClick={() => setIdx(i)}>{i + 1}</button>
+                ))}
+              </div>
+            </div>
+          ))}
           <ul className="legend small">
             <li><i className="p-answered" /> Answered</li>
             <li><i className="p-marked" /> Marked</li>
@@ -235,11 +257,8 @@ export default function TestRunner() {
             <li><i className="p-new" /> Not visited</li>
           </ul>
           <p className="muted small">{answeredCount}/{qs.length} answered</p>
-          <button
-            className="btn btn-accent full"
-            onClick={() => window.confirm(`You have answered ${answeredCount} of ${qs.length}. Submit now?`) && submit()}
-          >
-            Submit test
+          <button className="btn btn-accent full" disabled={phase === 'submitting'} onClick={confirmSubmit}>
+            {phase === 'submitting' ? 'Submitting…' : 'Submit test'}
           </button>
         </aside>
       </div>
